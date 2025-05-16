@@ -180,7 +180,7 @@ const HeroSection = () => {
             logoSize="80px"
             logoBackgroundColor="rgba(20, 20, 30, 0.9)"
             cryptoVariants={["Bitcoin", "USDT", "ETH", "Stellar"]}
-            cashVariants={["Naira", "Shilling", "Cedis"]}
+            cashVariants={["Naira", "Pounds", "Cedis"]}
             cryptoColor="56, 189, 248" // Blue (RGB format)
             cashColor="250, 204, 21" // Yellow (RGB format)
             height="350px"

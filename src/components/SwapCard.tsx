@@ -20,7 +20,6 @@ import {
    isSwapValid,
 } from "../utils/swapUtils";
 import { useTokenBalances } from "../hooks/useTokenBalance";
-import { useCurrencyConversion } from "../hooks/useCurrencyConversion";
 
 interface SwapCardProps {
    onSwapInitiate?: (details: SwapDetails) => void;
@@ -243,10 +242,7 @@ const SwapCard: React.FC<SwapCardProps> = ({ onSwapInitiate }) => {
                  tokensWithBalances.find((t) => t.symbol === symbol),
               imageKey: "icon",
            };
-   const handleReceiveAmountUpdate = (amount: string) => {
-      // Update the receive amount when currency conversion happens
-      setReceiveAmount(amount);
-   };
+
    return (
       <div className="w-full max-w-md mx-auto">
          <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-3xl p-0.5 shadow-lg">
@@ -277,7 +273,6 @@ const SwapCard: React.FC<SwapCardProps> = ({ onSwapInitiate }) => {
                   isInput={false}
                   sendAmount={sendAmount}
                   receiveAmount={receiveAmount}
-                  onReceiveAmountUpdate={handleReceiveAmountUpdate} // Add this new prop
                   selectedToken={selectedToken}
                   selectedCurrency={selectedCurrency}
                   swapMode={swapMode}

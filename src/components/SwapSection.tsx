@@ -1,5 +1,5 @@
 // components/SwapSection.tsx
-import React, { useEffect } from "react";
+import React from "react";
 import { ChevronDown } from "lucide-react";
 import {
    SectionInfo,
@@ -9,15 +9,11 @@ import {
 } from "../types/SwapTypes";
 import { FaWallet } from "react-icons/fa";
 import { getImageUrl } from "../utils/swapUtils";
-import { exchangeRates } from "../constants/swapConstants"; // Still needed for non-USD/NGN conversions
+import { exchangeRates } from "../constants/swapConstants"; // Still needed for non-USD conversions
 import {
    useTokenQuote,
    formatBalance,
-} from "../contracts/hooks/useQuoteContract";
-import {
-   useCurrencyConversion,
-   ConversionCurrency,
-} from "../hooks/useCurrencyConversion"; // Import our new hook
+} from "../contracts/hooks/useQuoteContract"; // Import our hook
 
 interface SwapSectionProps {
    sectionInfo: SectionInfo;
@@ -25,7 +21,6 @@ interface SwapSectionProps {
    sendAmount: string;
    receiveAmount: string;
    onAmountChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
-   onReceiveAmountUpdate?: (amount: string) => void; // New prop for updating receive amount
    selectedToken: TokenSymbol | null;
    selectedCurrency: CurrencySymbol | null;
    swapMode: SwapMode;
@@ -40,7 +35,6 @@ const SwapSection: React.FC<SwapSectionProps> = ({
    sendAmount,
    receiveAmount,
    onAmountChange,
-   onReceiveAmountUpdate,
    selectedToken,
    selectedCurrency,
    swapMode,
@@ -58,80 +52,13 @@ const SwapSection: React.FC<SwapSectionProps> = ({
    const shouldFetchQuote =
       sectionInfo.isToken && (isInput ? !!sendAmount : !!receiveAmount);
 
-   // Use our token quote hook to get real-time USD value
+   // Use our custom hook to get real-time USD value
    const { quoteInUSD, isLoading: isQuoteLoading } = useTokenQuote(
       isInput ? sendAmount : receiveAmount,
       shouldFetchQuote ? (selected as string) : null
    );
 
-   // Determine if we need currency conversion
-   const shouldConvert =
-      selectedCurrency === "NGN" &&
-      // Case 1: Token to NGN conversion (in receive section)
-      ((swapMode === "tokenToCurrency" && !isInput && quoteInUSD > 0) ||
-         // Case 2: NGN to Token conversion (in send section)
-         (swapMode === "currencyToToken" &&
-            isInput &&
-            !!sendAmount &&
-            parseFloat(sendAmount) > 0));
-
-   // Use our currency conversion hook when needed
-   const {
-      convertedAmount,
-      formattedAmount,
-      loading: isConversionLoading,
-      error: conversionError,
-      rate,
-   } = useCurrencyConversion(
-      // If token to NGN, use USD quote; if NGN to token, use send amount
-      swapMode === "tokenToCurrency" ? quoteInUSD : sendAmount,
-      // Source currency depends on swap mode
-      swapMode === "tokenToCurrency" ? "USD" : "NGN",
-      // Target currency depends on swap mode
-      swapMode === "tokenToCurrency" ? "NGN" : "USD",
-      // Only run if we need conversion
-      shouldConvert
-   );
-
-   // Update receive amount when conversion happens
-   useEffect(() => {
-      if (
-         shouldConvert &&
-         !isConversionLoading &&
-         parseFloat(convertedAmount) > 0
-      ) {
-         // If this is the receive section in token->currency mode
-         if (
-            !isInput &&
-            swapMode === "tokenToCurrency" &&
-            onReceiveAmountUpdate
-         ) {
-            onReceiveAmountUpdate(convertedAmount);
-         }
-
-         // If this is the USD value in currency->token mode, we can use it for USD display
-         // The actual token amount calculation is handled elsewhere
-      }
-   }, [
-      convertedAmount,
-      isConversionLoading,
-      shouldConvert,
-      isInput,
-      swapMode,
-      onReceiveAmountUpdate,
-   ]);
-
    const getExchangeRateText = () => {
-      // If we have a direct rate from the API, use it
-      if (shouldConvert && rate !== null) {
-         if (swapMode === "tokenToCurrency" && !isInput) {
-            return `1 USD ≈ ${rate.toLocaleString()} NGN`;
-         } else if (swapMode === "currencyToToken" && isInput) {
-            return `1 NGN ≈ ${(1 / rate).toFixed(8)} USD`;
-         }
-      }
-
-      // Fallback to previous implementation for other currencies
       if (!selectedToken || !selectedCurrency) return null;
 
       if (swapMode === "tokenToCurrency" && isInput && selected) {
@@ -173,17 +100,6 @@ const SwapSection: React.FC<SwapSectionProps> = ({
          });
       }
 
-      // If this is NGN in a currency->token swap, use our conversion
-      if (
-         !isToken &&
-         symbol === "NGN" &&
-         swapMode === "currencyToToken" &&
-         !isConversionLoading
-      ) {
-         // Return converted USD amount
-         return formattedAmount;
-      }
-
       // Fallback to previous calculation method
       if (!amount || !symbol || parseFloat(amount) === 0) return "0.00";
 
@@ -208,31 +124,6 @@ const SwapSection: React.FC<SwapSectionProps> = ({
             maximumFractionDigits: 2,
          });
       }
-   };
-
-   // Determine what value to display in receive section
-   const displayAmount = () => {
-      if (!isInput) {
-         // If this is NGN in a token->currency swap, show conversion result
-         if (
-            selectedCurrency === "NGN" &&
-            swapMode === "tokenToCurrency" &&
-            shouldConvert
-         ) {
-            if (isConversionLoading) {
-               return (
-                  <div className="flex items-center gap-2">
-                     <div className="animate-pulse bg-gray-200 h-9 w-32 rounded"></div>
-                  </div>
-               );
-            }
-            // Show formatted amount with commas
-            return formattedAmount;
-         }
-         // Default to regular receive amount
-         return receiveAmount || "0";
-      }
-      return null; // Not needed for input section
    };
 
    // Format the balance to avoid overflow
@@ -286,7 +177,7 @@ const SwapSection: React.FC<SwapSectionProps> = ({
                />
             ) : (
                <div className="text-4xl font-light text-gray-900">
-                  {displayAmount()}
+                  {receiveAmount || "0"}
                </div>
             )}
          </div>
@@ -298,7 +189,7 @@ const SwapSection: React.FC<SwapSectionProps> = ({
                {sendAmount && selectedToken && selectedCurrency && (
                   <span>
                      {isInput
-                        ? isQuoteLoading || isConversionLoading
+                        ? isQuoteLoading
                            ? "Loading price..."
                            : `$${calculateUSDValue(
                                 sendAmount,
