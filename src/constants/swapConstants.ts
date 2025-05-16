@@ -63,8 +63,8 @@ export const currencies: Currency[] = [
    },
    {
       symbol: "KES",
-      name: "Shilling",
-      flag: "https://flagcdn.com/w40/ke.png",
+      name: "Pounds",
+      flag: "https://flagcdn.com/w40/gb.png",
    },
    {
       symbol: "GHS",
@@ -81,12 +81,12 @@ export const currencies: Currency[] = [
 // Update exchange rates for all tokens
 export const exchangeRates: ExchangeRates = {
    // Token to Currency rates
-   ETH: { NGN: 7500000, KES: 3500, GHS: 68000, USD: 4500 },
-   USDC: { NGN: 1595, KES: 0.78, GHS: 14.5, USD: 1 },
-   USDT: { NGN: 1595, KES: 0.78, GHS: 14.5, USD: 1 },
-   WETH: { NGN: 7500000, KES: 3500, GHS: 68000, USD: 4500 },
-   ZORA: { NGN: 15000, KES: 7, GHS: 135, USD: 9 },
-   DEGEN: { NGN: 800, KES: 0.4, GHS: 7, USD: 0.5 },
+   ETH: { NGN: 7500000, GBP: 3500, GHS: 68000, USD: 4500 },
+   USDC: { NGN: 1595, GBP: 0.78, GHS: 14.5, USD: 1 },
+   USDT: { NGN: 1595, GBP: 0.78, GHS: 14.5, USD: 1 },
+   WETH: { NGN: 7500000, GBP: 3500, GHS: 68000, USD: 4500 },
+   ZORA: { NGN: 15000, GBP: 7, GHS: 135, USD: 9 },
+   DEGEN: { NGN: 800, GBP: 0.4, GHS: 7, USD: 0.5 },
 
    // Currency to Token rates
    NGN: {
@@ -97,7 +97,7 @@ export const exchangeRates: ExchangeRates = {
       ZORA: 0.000067,
       DEGEN: 0.00125,
    },
-   KES: {
+   GBP: {
       ETH: 0.00029,
       USDC: 1.28,
       USDT: 1.28,
