@@ -1,7 +1,6 @@
 // hooks/useCurrencyConversion.ts
 import { useState, useEffect, useRef } from "react";
 import axios from "axios";
-import { exchangeRates } from "../constants/swapConstants";
 
 const API_BASE_URL = "https://aboki-api.onrender.com/api/conversion";
 const CACHE_DURATION = 60 * 1000; // 1 minute cache
@@ -14,7 +13,6 @@ export type ConversionCurrency = "USD" | "NGN";
 interface CacheEntry {
    value: number;
    timestamp: number;
-   rate: number;
 }
 
 interface ConversionResult {
@@ -24,24 +22,6 @@ interface ConversionResult {
    loading: boolean;
    error: Error | null;
 }
-
-// Helper function to get expected rate range for validation
-const getExpectedRateRange = (from: string, to: string): [number, number] => {
-   // Get reference rate from existing exchange rates
-   let referenceRate: number = 0;
-
-   if (from === "USD" && to === "NGN") {
-      referenceRate = exchangeRates.USDC?.NGN || 1595;
-      // Allow 25% variation from reference rate
-      return [referenceRate * 0.75, referenceRate * 1.25];
-   } else if (from === "NGN" && to === "USD") {
-      referenceRate = 1 / (exchangeRates.USDC?.NGN || 1595);
-      return [referenceRate * 0.75, referenceRate * 1.25];
-   }
-
-   // Default 50% variation for other currencies
-   return [0.5, 2.0];
-};
 
 // Simple cache implementation with direction awareness
 const conversionCache: Record<string, CacheEntry> = {};
@@ -76,28 +56,6 @@ export function useCurrencyConversion(
       });
    };
 
-   // Fallback to static rates if needed
-   const useFallbackRate = (numericAmount: number) => {
-      let fallbackRate = 0;
-
-      if (fromCurrency === "USD" && toCurrency === "NGN") {
-         fallbackRate = exchangeRates.USDC?.NGN || 1595;
-      } else if (fromCurrency === "NGN" && toCurrency === "USD") {
-         fallbackRate = 1 / (exchangeRates.USDC?.NGN || 1595);
-      }
-
-      if (fallbackRate > 0) {
-         const result = numericAmount * fallbackRate;
-         console.log(`Using fallback rate ${fallbackRate}`);
-         setRate(fallbackRate);
-         setConvertedAmount(result.toString());
-         setFormattedAmount(formatAmount(result));
-         return true;
-      }
-
-      return false;
-   };
-
    // Convert between currencies using the API
    const fetchConversion = async (numericAmount: number) => {
       if (!shouldConvert) return;
@@ -113,20 +71,14 @@ export function useCurrencyConversion(
          cachedResult &&
          Date.now() - cachedResult.timestamp < CACHE_DURATION
       ) {
-         console.log(`Using cached conversion: rate ${cachedResult.rate}`);
          setConvertedAmount(cachedResult.value.toString());
          setFormattedAmount(formatAmount(cachedResult.value));
-         setRate(cachedResult.rate);
          setLoading(false);
          return;
       }
 
       try {
          // Get the exchange rate from the API
-         console.log(
-            `Fetching ${fromCurrency}->${toCurrency} rate for ${numericAmount}`
-         );
-
          const response = await axios.get(`${API_BASE_URL}/rate`, {
             params: {
                from: fromCurrency,
@@ -138,67 +90,30 @@ export function useCurrencyConversion(
             },
          });
 
-         // Extract the conversion rate from API
-         const apiRate = response.data.rate;
-         console.log(
-            `API returned ${fromCurrency}->${toCurrency} rate: ${apiRate}`
-         );
+         // Extract the conversion rate
+         const conversionRate = response.data.rate;
+         setRate(conversionRate);
 
-         // Validate rate against expected range
-         const [minExpected, maxExpected] = getExpectedRateRange(
-            fromCurrency,
-            toCurrency
-         );
-         let finalRate = apiRate;
-
-         // If rate seems off, check if inverting it makes more sense
-         if (apiRate < minExpected || apiRate > maxExpected) {
-            const invertedRate = 1 / apiRate;
-
-            if (invertedRate >= minExpected && invertedRate <= maxExpected) {
-               console.log(
-                  `API returned inverted rate. Correcting ${apiRate} to ${invertedRate}`
-               );
-               finalRate = invertedRate;
-            } else {
-               console.warn(
-                  `API rate ${apiRate} outside expected range [${minExpected}, ${maxExpected}] - using anyway`
-               );
-            }
-         }
-
-         // Calculate the result using the validated rate
-         const result = numericAmount * finalRate;
+         // Calculate the converted amount
+         const result = numericAmount * conversionRate;
 
          // Update cache
          conversionCache[cacheKey] = {
             value: result,
-            rate: finalRate,
             timestamp: Date.now(),
          };
 
          // Set both raw and formatted values
-         setRate(finalRate);
          setConvertedAmount(result.toString());
          setFormattedAmount(formatAmount(result));
-
-         console.log(
-            `Conversion result: ${numericAmount} ${fromCurrency} = ${formatAmount(
-               result
-            )} ${toCurrency}`
-         );
       } catch (err) {
          console.error(
             `Error converting ${fromCurrency} to ${toCurrency}:`,
             err
          );
          setError(err as Error);
-
-         // Try to use fallback rate
-         if (!useFallbackRate(numericAmount)) {
-            setConvertedAmount("0");
-            setFormattedAmount("Error");
-         }
+         setConvertedAmount("0");
+         setFormattedAmount("Error");
       } finally {
          setLoading(false);
       }

@@ -65,18 +65,15 @@ const SwapSection: React.FC<SwapSectionProps> = ({
    );
 
    // Determine if we need currency conversion
-   // Determine if we need currency conversion
    const shouldConvert =
       selectedCurrency === "NGN" &&
       // Case 1: Token to NGN conversion (in receive section)
-      ((swapMode === "tokenToCurrency" && !isInput) ||
+      ((swapMode === "tokenToCurrency" && !isInput && quoteInUSD > 0) ||
          // Case 2: NGN to Token conversion (in send section)
-         (swapMode === "currencyToToken" && isInput && !!sendAmount));
-
-   const useAmount =
-      swapMode === "tokenToCurrency"
-         ? quoteInUSD || parseFloat(sendAmount) || 1 // Use send amount as fallback
-         : sendAmount || "1"; // Always have a minimum amount
+         (swapMode === "currencyToToken" &&
+            isInput &&
+            !!sendAmount &&
+            parseFloat(sendAmount) > 0));
 
    // Use our currency conversion hook when needed
    const {
@@ -86,53 +83,16 @@ const SwapSection: React.FC<SwapSectionProps> = ({
       error: conversionError,
       rate,
    } = useCurrencyConversion(
-      useAmount,
+      // If token to NGN, use USD quote; if NGN to token, use send amount
+      swapMode === "tokenToCurrency" ? quoteInUSD : sendAmount,
+      // Source currency depends on swap mode
       swapMode === "tokenToCurrency" ? "USD" : "NGN",
+      // Target currency depends on swap mode
       swapMode === "tokenToCurrency" ? "NGN" : "USD",
-      true // Force enable for testing
+      // Only run if we need conversion
+      shouldConvert
    );
 
-   // Add this debugging after the hook call
-   console.log("Currency conversion call:", {
-      inputAmount: useAmount,
-      fromCurrency: swapMode === "tokenToCurrency" ? "USD" : "NGN",
-      toCurrency: swapMode === "tokenToCurrency" ? "NGN" : "USD",
-      result: {
-         convertedAmount,
-         formattedAmount,
-         loading: isConversionLoading,
-      },
-   });
-   // Debug logging
-   useEffect(() => {
-      if (shouldConvert) {
-         console.log("Currency conversion result:", {
-            convertedAmount,
-            formattedAmount,
-            rate,
-            isLoading: isConversionLoading,
-         });
-      }
-   }, [
-      convertedAmount,
-      formattedAmount,
-      rate,
-      isConversionLoading,
-      shouldConvert,
-   ]);
-   // In SwapSection.tsx - Add this after the useCurrencyConversion hook
-   useEffect(() => {
-      console.log("Conversion Debug:", {
-         shouldConvert,
-         isConversionLoading,
-         convertedAmount,
-         formattedAmount,
-         swapMode,
-         isInput,
-         quoteInUSD,
-         sendAmount,
-      });
-   }, [shouldConvert, isConversionLoading, convertedAmount, formattedAmount]);
    // Update receive amount when conversion happens
    useEffect(() => {
       if (
@@ -291,12 +251,7 @@ const SwapSection: React.FC<SwapSectionProps> = ({
       parseFloat(sendAmount) >
          parseFloat(balanceValue?.replace(/,/g, "") || "0") &&
       !isBalanceLoading;
-   console.log("Key variables check:", {
-      selectedCurrency,
-      swapMode,
-      isInput,
-      quoteInUSD,
-   });
+
    return (
       <div className="bg-[#fafafa] rounded-2xl p-4 shadow-md">
          {/* Title and Balance Row */}
