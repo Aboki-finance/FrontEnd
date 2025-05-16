@@ -12,7 +12,7 @@ interface Particle {
 
 export default function CryptoToCashAnimation(): JSX.Element {
    const cryptoVariants = ["Bitcoin", "USDT", "ETH", "Stellar"];
-   const cashVariants = ["Naira", "Shilling", "Cedis"];
+   const cashVariants = ["Naira", "Pounds", "Cedis"];
 
    const [particles, setParticles] = useState<Particle[]>([]);
    const animationRef = useRef<number | null>(null);

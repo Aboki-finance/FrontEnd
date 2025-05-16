@@ -13,7 +13,7 @@ const PrivyConfig = ({ children }: PrivyConfigProps) => {
             appearance: {
                theme: "dark",
                accentColor: "#7c3aed",
-               logo: "/assets/logo.png",
+               logo: "src/assets/logo-white.png",
             },
             embeddedWallets: {
                createOnLogin: "users-without-wallets",

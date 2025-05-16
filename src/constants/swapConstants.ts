@@ -62,7 +62,7 @@ export const currencies: Currency[] = [
       flag: "https://flagcdn.com/w40/ng.png",
    },
    {
-      symbol: "KES",
+      symbol: "GBP",
       name: "Pounds",
       flag: "https://flagcdn.com/w40/gb.png",
    },

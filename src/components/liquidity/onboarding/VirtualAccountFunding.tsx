@@ -27,9 +27,9 @@ const currencies = [
       available: false,
    },
    {
-      symbol: "KES" as CurrencySymbol,
-      name: "Kenyan Shilling",
-      flag: "🇰🇪 ",
+      symbol: "GBP" as CurrencySymbol,
+      name: "British Pound",
+      flag: "🇬🇧",
       available: false,
    },
    {

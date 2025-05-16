@@ -38,10 +38,10 @@ const CryptoFlowAnimation: React.FC<CryptoFlowAnimationProps> = ({
    logoSize = "64px",
    logoBackgroundColor = "rgba(30, 30, 30, 0.8)",
    cryptoVariants = ["Bitcoin", "USDT", "ETH", "Stellar"],
-   cashVariants = ["Naira", "Shilling", "Cedis"],
+   cashVariants = ["Naira", "Pounds", "Cedis"],
    finalWords = ["HTML", "CSS", "JavaScript"],
    cryptoColor = "56, 189, 248",
-   //
+   // 
    finalColor = "148, 163, 184",
    animationSpeed = 1,
    linesYOffset = [-30, 0, 30],
