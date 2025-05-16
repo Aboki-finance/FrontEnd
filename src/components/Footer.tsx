@@ -1,5 +1,6 @@
 import React from "react";
 import { FaTwitter, FaGithub, FaTelegram, FaDiscord } from "react-icons/fa";
+import Logo from "./Logo-Black";
 
 const Footer: React.FC = () => {
    return (

@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 
-const API_BASE_URL = "https://aboki-api.onrender.com/api/conversion";
+const API_BASE_URL = "http://170.187.143.46:6000/api/conversion";
 const CACHE_DURATION = 60 * 1000; // 1 minute cache
 const DEBOUNCE_DELAY = 300; // 300ms debounce
 

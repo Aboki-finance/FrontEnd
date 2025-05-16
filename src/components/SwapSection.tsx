@@ -168,8 +168,8 @@ const SwapSection: React.FC<SwapSectionProps> = ({
       // If we have a real-time quote from the smart contract, use it
       if (isToken && quoteInUSD && !isQuoteLoading) {
          return quoteInUSD.toLocaleString("en-US", {
-            minimumFractionDigits: 3,
-            maximumFractionDigits: 3,
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
          });
       }
 
@@ -193,8 +193,8 @@ const SwapSection: React.FC<SwapSectionProps> = ({
          // For tokens, get the USD rate directly
          const usdRate = exchangeRates[symbol]?.USD || 0;
          return (numericAmount * usdRate).toLocaleString("en-US", {
-            minimumFractionDigits: 3,
-            maximumFractionDigits: 3,
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
          });
       } else {
          // For currencies, convert to USD
@@ -204,8 +204,8 @@ const SwapSection: React.FC<SwapSectionProps> = ({
          // We'll use USDC as the intermediate since it's pegged to USD
          const currencyToUSDC = exchangeRates[symbol]?.USDC || 0;
          return (numericAmount * currencyToUSDC).toLocaleString("en-US", {
-            minimumFractionDigits: 3,
-            maximumFractionDigits: 3,
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
          });
       }
    };
