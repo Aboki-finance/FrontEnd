@@ -6,7 +6,7 @@
 │   ├── ethereumlogo.png
 │   ├── Fulllogo.png
 │   ├── heroImage.png
-│   ├── logo-black.png
+│   ├── aboki.svg
 │   ├── logo.jpeg
 │   ├── logo.png
 │   ├── logo-white.png
@@ -36,15 +36,15 @@
 │   │   ├── IntegrationGuide.md
 │   │   ├── LiquidityProvider.tsx
 │   │   └── onboarding
-│   │       ├── BankDetails.tsx
-│   │       ├── CryptoDestination.tsx
-│   │       ├── KYCVerification.tsx
-│   │       ├── ProfileSetup.tsx
-│   │       ├── RoleSelection.tsx
-│   │       ├── SuccessConfirmation.tsx
-│   │       ├── VirtualAccountFunding.tsx
-│   │       ├── WalletConnection.tsx
-│   │       └── WalletFunding.tsx
+│   │   ├── BankDetails.tsx
+│   │   ├── CryptoDestination.tsx
+│   │   ├── KYCVerification.tsx
+│   │   ├── ProfileSetup.tsx
+│   │   ├── RoleSelection.tsx
+│   │   ├── SuccessConfirmation.tsx
+│   │   ├── VirtualAccountFunding.tsx
+│   │   ├── WalletConnection.tsx
+│   │   └── WalletFunding.tsx
 │   ├── Logo-Black.tsx
 │   ├── Logo.tsx
 │   ├── modals
@@ -62,7 +62,7 @@
 │   │   │   ├── ProfileDropdown.tsx
 │   │   │   └── WalletInfo.tsx
 │   │   └── hooks
-│   │       └── useWallet.tsx
+│   │   └── useWallet.tsx
 │   ├── SelectModal.tsx
 │   ├── StatsSection.tsx
 │   ├── style.css
@@ -80,7 +80,7 @@
 │   │   └── QuoteContract.json
 │   ├── addresses.ts
 │   └── hooks
-│       └── useQuoteContract.ts
+│   └── useQuoteContract.ts
 ├── hooks
 │   └── useTokenBalance.ts
 ├── index.css

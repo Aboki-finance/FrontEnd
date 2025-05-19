@@ -1,77 +1,94 @@
-import {
-   Token,
-   Currency,
-   TokenSymbol,
-   CurrencySymbol,
-   SwapMode,
-} from "../types/SwapTypes";
+// src/utils/swapUtils.ts
+import { TokenSymbol, CurrencySymbol, SwapMode } from "../types/SwapTypes";
 import { exchangeRates } from "../constants/swapConstants";
 
-export const getImageUrl = (
-   item: Token | Currency | undefined,
-   imageKey: "icon" | "flag"
-): string => {
-   if (!item) return "";
-   if (imageKey === "icon" && "icon" in item) {
-      return item.icon;
-   } else if (imageKey === "flag" && "flag" in item) {
-      return item.flag;
-   }
-   return "";
+// Enhanced logger with timestamp and category
+export const logger = {
+  log: (category: string, message: string, data?: any) => {
+    const timestamp = new Date().toISOString();
+    const formattedMessage = `[${timestamp}] [${category}] ${message}`;
+    
+    if (data) {
+      console.groupCollapsed(formattedMessage);
+      console.log(data);
+      console.groupEnd();
+    } else {
+      console.log(formattedMessage);
+    }
+  }
 };
 
+// Get current exchange rate between token and currency
 export const getCurrentExchangeRate = (
-   swapMode: SwapMode,
-   selectedToken: TokenSymbol | null,
-   selectedCurrency: CurrencySymbol | null
+  swapMode: SwapMode,
+  token: TokenSymbol | null,
+  currency: CurrencySymbol | null
 ): number => {
-   if (!selectedToken || !selectedCurrency) return 1;
-   if (swapMode === "tokenToCurrency") {
-      return exchangeRates[selectedToken]?.[selectedCurrency] || 1;
-   } else {
-      return exchangeRates[selectedCurrency]?.[selectedToken] || 1;
-   }
+  if (!token || !currency) return 0;
+
+  if (swapMode === "tokenToCurrency") {
+    return exchangeRates?.[token]?.[currency] || 0;
+  } else {
+    return exchangeRates?.[currency]?.[token] || 0;
+  }
 };
 
+// Calculate receive amount based on send amount and exchange rate
 export const calculateReceiveAmount = (
-   sendAmount: string,
-   swapMode: SwapMode,
-   selectedToken: TokenSymbol | null,
-   selectedCurrency: CurrencySymbol | null
+  amount: string,
+  swapMode: SwapMode,
+  token: TokenSymbol | null,
+  currency: CurrencySymbol | null
 ): string => {
-   const numericValue = parseFloat(sendAmount) || 0;
-   if (numericValue <= 0 || !selectedToken || !selectedCurrency) {
-      return "";
-   }
-   const rate = getCurrentExchangeRate(
-      swapMode,
-      selectedToken,
-      selectedCurrency
-   );
-   const calculatedValue = numericValue * rate;
+  if (!amount || !token || !currency) return "";
 
-   // Updated condition to remove BTC reference
-   const decimals =
-      swapMode === "currencyToToken" &&
-      (selectedToken === "ETH" || selectedToken === "WETH") // Changed to check for ETH and WETH
-         ? 8
-         : 2;
+  const numericAmount = parseFloat(amount);
+  if (isNaN(numericAmount) || numericAmount === 0) return "";
 
-   return calculatedValue.toFixed(decimals);
+  const rate = getCurrentExchangeRate(swapMode, token, currency);
+  if (rate === 0) return "";
+
+  return (numericAmount * rate).toFixed(2);
 };
 
+// Validate if swap is valid based on inputs and selections
 export const isSwapValid = (
-   sendAmount: string,
-   receiveAmount: string,
-   selectedToken: TokenSymbol | null,
-   selectedCurrency: CurrencySymbol | null
+  sendAmount: string,
+  receiveAmount: string,
+  token: TokenSymbol | null,
+  currency: CurrencySymbol | null
 ): boolean => {
-   return !!(
-      sendAmount &&
-      receiveAmount &&
-      selectedToken &&
-      selectedCurrency &&
-      parseFloat(sendAmount) > 0 &&
-      parseFloat(receiveAmount) > 0
-   );
+  return (
+    !!sendAmount &&
+    !!receiveAmount &&
+    parseFloat(sendAmount) > 0 &&
+    parseFloat(receiveAmount) > 0 &&
+    !!token &&
+    !!currency
+  );
+};
+
+// Format balance to avoid overflow
+export const formatBalance = (balanceStr: string, maxDecimals: number = 4): string => {
+  const balance = parseFloat(balanceStr);
+  if (isNaN(balance)) return "0.00";
+  
+  if (balance < 0.0001) {
+    return "< 0.0001";
+  }
+  
+  // Format with commas for thousands and limit decimals
+  return balance.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: maxDecimals
+  });
+};
+
+// Get image URL for token or currency
+export const getImageUrl = (
+  item: any,
+  imageKey: "icon" | "flag"
+): string => {
+  if (!item) return "https://placehold.co/24x24";
+  return item[imageKey] || "https://placehold.co/24x24";
 };

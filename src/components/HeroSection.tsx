@@ -41,7 +41,7 @@ const HeroSection = () => {
          await login();
 
          if (user?.wallet?.address) {
-            const provider = new JsonRpcProvider("https://mainnet.base.org");
+            const provider = new JsonRpcProvider("https://ethereum-sepolia-rpc.publicnode.com");
             const balance = await provider.getBalance(user.wallet.address);
             const formattedBalance = formatEther(balance);
 
@@ -171,7 +171,7 @@ const HeroSection = () => {
                         whileHover="hover"
                         whileTap="tap"
                         onClick={() =>
-                           window.open("https://t.me/Aboki_swap_bot", "_blank")
+                           window.open("https://t.me/ABOKI_RAMP_BOT", "_blank")
                         }
                         className="bg-[#fff] border border-purple-400 text-purple-600 hover:text-purple-400 hover:border-purple-400 font-semibold py-3 px-8 rounded-full flex gap-2 items-center transition-all duration-300">
                         <FaTelegram

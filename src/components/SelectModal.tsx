@@ -1,6 +1,7 @@
 import React from "react";
 import { Search } from "lucide-react";
 import { Token, Currency, TokenSymbol } from "../types/SwapTypes";
+import { formatBalance } from "../contracts/hooks/useQuoteContract";
 
 interface SelectModalProps {
    isOpen: boolean;
@@ -103,9 +104,13 @@ const SelectModal: React.FC<SelectModalProps> = ({
                         </div>
                      </div>
                      {isToken && authenticated && getTokenBalance && (
-                        <div className="text-white">
-                           {getTokenBalance(item.symbol as TokenSymbol)}
-                        </div>
+                       <div className="text-purple-300">
+                       {/* {getTokenBalance(item.symbol as TokenSymbol)} */}
+                       {formatBalance(
+                       getTokenBalance(item.symbol as TokenSymbol),
+                       5
+                       )}
+                       </div>
                      )}
                   </div>
                ))}

@@ -20,10 +20,10 @@ export function useTokenBalance(
    decimals: number = 18
 ): UseTokenBalanceResult {
    const { address } = useAccount();
-
+   
    // Determine if we should fetch native ETH or an ERC20 token
    const isNativeToken = !tokenAddress || tokenAddress.toLowerCase() === "eth";
-
+   
    // Fetch native ETH balance (wagmi auto-skips when address is undefined)
    const {
       data: ethData,
@@ -32,37 +32,40 @@ export function useTokenBalance(
    } = useBalance({
       address: isNativeToken && address ? address : undefined,
    });
-
+   
    // Fetch ERC20 token balance (wagmi auto-skips when address or args are undefined)
+   const shouldFetchTokenData = Boolean(
+      address && !isNativeToken && tokenAddress?.startsWith('0x')
+   );
+
    const {
       data: tokenData,
       isLoading: tokenLoading,
       error: tokenError,
       refetch: refetchToken,
-   } = useReadContract({
-      address:
-         !isNativeToken && tokenAddress
-            ? (tokenAddress as `0x${string}`)
-            : undefined,
-      abi: erc20Abi,
-      functionName: "balanceOf",
-      args: address ? [address as `0x${string}`] : undefined,
-   });
-
+   } = shouldFetchTokenData
+      ? useReadContract({
+           address: tokenAddress as `0x${string}`,
+           abi: erc20Abi,
+           functionName: "balanceOf",
+           args: [address as `0x${string}`],
+        })
+      : { data: undefined, isLoading: false, error: null, refetch: () => {} };
+   
    // Refetch ERC20 balance on address or tokenAddress change
    useEffect(() => {
-      if (address && !isNativeToken) {
+      if (address && !isNativeToken && tokenAddress?.startsWith('0x')) {
          refetchToken();
       }
-   }, [address, tokenAddress, refetchToken]);
-
+   }, [address, tokenAddress, refetchToken, isNativeToken]);
+   
    // Choose formatted result
    const formattedBalance = isNativeToken
       ? ethData?.formatted ?? "0"
       : tokenData
       ? formatUnits(tokenData as bigint, decimals)
       : "0";
-
+   
    return {
       balance: formattedBalance,
       isLoading: isNativeToken ? ethLoading : tokenLoading,
@@ -77,20 +80,37 @@ export function useTokenBalance(
 export function useTokenBalances(
    tokens: Record<string, { address: string; decimals: number }>
 ) {
-   const { address, isConnected } = useAccount();
-
+   const { address, isConnected, chainId } = useAccount();
+   
+   // Create a debug string to log current connection state
+   const connectionDebug = `Connected: ${isConnected}, Address: ${address}, Chain ID: ${chainId}`;
+   
+   // Log connection state for debugging
+   useEffect(() => {
+      console.log(connectionDebug);
+   }, [connectionDebug]);
+   
    const balances = Object.entries(tokens).reduce((acc, [symbol, token]) => {
-      const { balance, isLoading } = useTokenBalance(
+      const { balance, isLoading, error } = useTokenBalance(
          token.address,
          token.decimals
       );
+      
+      // Log any errors for specific tokens
+      useEffect(() => {
+         if (error) {
+            console.error(`Error fetching balance for ${symbol}:`, error);
+         }
+      }, [error, symbol]);
+      
       acc[symbol] = {
          balance: isLoading ? "..." : balance,
          isLoading,
+         error: error ? String(error) : null,
       };
       return acc;
-   }, {} as Record<string, { balance: string; isLoading: boolean }>);
-
+   }, {} as Record<string, { balance: string; isLoading: boolean; error: string | null }>);
+   
    return {
       balances,
       isConnected,

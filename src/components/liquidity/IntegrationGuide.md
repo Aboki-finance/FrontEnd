@@ -65,7 +65,7 @@ Copy these components to the `components/liquidity/onboarding/` folder:
 
 ### 6. Add Dashboard Components
 
-Copy the `components/liquidity/dashboard/LiquidityDashboard.tsx` file to your project.
+Copy the `components/liquidity/activity/LiquidityDashboard.tsx` file to your project.
 
 ### 7. Add Main Component
 
@@ -82,7 +82,7 @@ Update your `App.tsx` file to include the routes for the Liquidity Provider feat
 ```tsx
 import { LiquidityProvider as LiquidityContextProvider } from "./context/LiquidityContext";
 import LiquidityProvider from "./components/liquidity/LiquidityProvider";
-import LiquidityDashboard from "./components/liquidity/dashboard/LiquidityDashboard";
+import LiquidityDashboard from "./components/liquidity/activity/LiquidityDashboard";
 
 // Inside your Routes component
 <Routes>

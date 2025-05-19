@@ -1,5 +1,5 @@
 // components/SwapSection.tsx
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { ChevronDown } from "lucide-react";
 import {
    SectionInfo,
@@ -9,11 +9,11 @@ import {
 } from "../types/SwapTypes";
 import { FaWallet } from "react-icons/fa";
 import { getImageUrl } from "../utils/swapUtils";
-import { exchangeRates } from "../constants/swapConstants"; // Still needed for non-USD conversions
+import { getExchangeRates, calculateWithExchangeRate } from "../constants/swapConstants";
 import {
    useTokenQuote,
    formatBalance,
-} from "../contracts/hooks/useQuoteContract"; // Import our hook
+} from "../contracts/hooks/useQuoteContract";
 
 interface SwapSectionProps {
    sectionInfo: SectionInfo;
@@ -48,83 +48,127 @@ const SwapSection: React.FC<SwapSectionProps> = ({
    const selectedItem = selected ? sectionInfo.findItem(selected) : undefined;
    const imageUrl = getImageUrl(selectedItem, sectionInfo.imageKey);
 
+   // State for exchange rate and USD values
+   const [usdValue, setUsdValue] = useState("0.00");
+   const [exchangeRateText, setExchangeRateText] = useState<string | null>(null);
+   const [isRateLoading, setIsRateLoading] = useState(false);
+   const [rateError, setRateError] = useState<string | null>(null);
+
    // Only fetch quote if this is a token section and we have an amount
    const shouldFetchQuote =
       sectionInfo.isToken && (isInput ? !!sendAmount : !!receiveAmount);
 
    // Use our custom hook to get real-time USD value
-   const { quoteInUSD, isLoading: isQuoteLoading } = useTokenQuote(
+   const { quoteInUSD, quoteInNGN, isLoading: isQuoteLoading, error: quoteError } = useTokenQuote(
       isInput ? sendAmount : receiveAmount,
       shouldFetchQuote ? (selected as string) : null
    );
 
-   const getExchangeRateText = () => {
-      if (!selectedToken || !selectedCurrency) return null;
-
-      if (swapMode === "tokenToCurrency" && isInput && selected) {
-         return `1 ${selected} ≈ ${
-            exchangeRates[selected as TokenSymbol]?.[
-               selectedCurrency
-            ]?.toLocaleString() || "0"
-         } ${selectedCurrency}`;
-      } else if (swapMode === "currencyToToken" && isInput && selected) {
-         return `1 ${selected} ≈ ${
-            exchangeRates[selected as CurrencySymbol]?.[
-               selectedToken
-            ]?.toLocaleString() || "0"
-         } ${selectedToken}`;
-      } else if (swapMode === "tokenToCurrency" && !isInput && selected) {
-         return `1 ${selected} ≈ ${(
-            1 /
-            (exchangeRates[selectedToken]?.[selected as CurrencySymbol] || 1)
-         ).toFixed(8)} ${selectedToken}`;
-      } else if (swapMode === "currencyToToken" && !isInput && selected) {
-         return `1 ${selected} ≈ ${(
-            1 /
-            (exchangeRates[selected as CurrencySymbol]?.[selectedToken] || 1)
-         ).toFixed(8)} ${selectedCurrency}`;
-      }
-      return null;
-   };
-
-   const calculateUSDValue = (
-      amount: string,
-      symbol: string | null,
-      isToken: boolean
-   ): string => {
-      // If we have a real-time quote from the smart contract, use it
-      if (isToken && quoteInUSD && !isQuoteLoading) {
-         return quoteInUSD.toLocaleString("en-US", {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-         });
+   // Update exchange rate text
+   useEffect(() => {
+      if (!selectedToken || !selectedCurrency) {
+         setExchangeRateText(null);
+         return;
       }
 
-      // Fallback to previous calculation method
-      if (!amount || !symbol || parseFloat(amount) === 0) return "0.00";
+      const updateRateText = async () => {
+         try {
+            setIsRateLoading(true);
+            setRateError(null);
+            
+            const rates = await getExchangeRates();
+            let rateText: string | null = null;
 
-      const numericAmount = parseFloat(amount);
+            if (swapMode === "tokenToCurrency" && isInput && selected) {
+               const rate = rates[selected as TokenSymbol]?.[selectedCurrency];
+               if (rate) {
+                  rateText = `1 ${selected} ≈ ${rate.toLocaleString()} ${selectedCurrency}`;
+               }
+            } else if (swapMode === "currencyToToken" && isInput && selected) {
+               const rate = rates[selected as CurrencySymbol]?.[selectedToken];
+               if (rate) {
+                  rateText = `1 ${selected} ≈ ${rate.toLocaleString()} ${selectedToken}`;
+               }
+            } else if (swapMode === "tokenToCurrency" && !isInput && selected) {
+               const rate = rates[selectedToken]?.[selected as CurrencySymbol];
+               if (rate && rate > 0) {
+                  rateText = `1 ${selected} ≈ ${(1 / rate).toFixed(8)} ${selectedToken}`;
+               }
+            } else if (swapMode === "currencyToToken" && !isInput && selected) {
+               const rate = rates[selected as CurrencySymbol]?.[selectedToken];
+               if (rate && rate > 0) {
+                  rateText = `1 ${selected} ≈ ${(1 / rate).toFixed(8)} ${selectedCurrency}`;
+               }
+            }
 
-      if (isToken) {
-         // For tokens, get the USD rate directly
-         const usdRate = exchangeRates[symbol]?.USD || 0;
-         return (numericAmount * usdRate).toLocaleString("en-US", {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-         });
-      } else {
-         // For currencies, convert to USD
-         if (symbol === "USD") return numericAmount.toFixed(2);
+            setExchangeRateText(rateText);
+         } catch (error) {
+            console.error("Failed to get exchange rate:", error);
+            setRateError("Rate unavailable");
+            setExchangeRateText(null);
+         } finally {
+            setIsRateLoading(false);
+         }
+      };
 
-         // Convert currency to USD using token as intermediate
-         // We'll use USDC as the intermediate since it's pegged to USD
-         const currencyToUSDC = exchangeRates[symbol]?.USDC || 0;
-         return (numericAmount * currencyToUSDC).toLocaleString("en-US", {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-         });
-      }
-   };
+      updateRateText();
+   }, [selectedToken, selectedCurrency, swapMode, isInput, selected]);
+
+   // Update USD value when amount changes
+   useEffect(() => {
+      const updateUsdValue = async () => {
+         if (!selected || (!sendAmount && !receiveAmount)) {
+            setUsdValue("0.00");
+            return;
+         }
+
+         try {
+            // If we have a quote from the API, use it
+            if (sectionInfo.isToken && quoteInUSD !== null && !isQuoteLoading) {
+               setUsdValue(
+                  quoteInUSD.toLocaleString("en-US", {
+                     minimumFractionDigits: 2,
+                     maximumFractionDigits: 2,
+                  })
+               );
+               return;
+            }
+
+            // Otherwise calculate from exchange rates
+            const amount = isInput ? sendAmount : receiveAmount;
+            if (!amount || parseFloat(amount) === 0) {
+               setUsdValue("0.00");
+               return;
+            }
+
+            const usdAmount = await calculateWithExchangeRate(
+               amount,
+               selected,
+               "USD"
+            ).catch(() => 0);
+
+            setUsdValue(
+               usdAmount.toLocaleString("en-US", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+               })
+            );
+         } catch (error) {
+            console.error("Failed to calculate USD value:", error);
+            setUsdValue("--");
+         }
+      };
+
+      updateUsdValue();
+   }, [
+      sendAmount,
+      receiveAmount,
+      selected,
+      sectionInfo.isToken,
+      isInput,
+      quoteInUSD,
+      isQuoteLoading,
+   ]);
 
    // Format the balance to avoid overflow
    const balanceValue =
@@ -186,17 +230,19 @@ const SwapSection: React.FC<SwapSectionProps> = ({
          <div className="flex items-center justify-between">
             {/* USD Value or Exchange Rate Info */}
             <div className="text-xs text-gray-400">
-               {sendAmount && selectedToken && selectedCurrency && (
+               {(sendAmount || receiveAmount) && selectedToken && selectedCurrency && (
                   <span>
                      {isInput
-                        ? isQuoteLoading
+                        ? isQuoteLoading || isRateLoading
                            ? "Loading price..."
-                           : `$${calculateUSDValue(
-                                sendAmount,
-                                selected,
-                                sectionInfo.isToken
-                             )}`
-                        : getExchangeRateText()}
+                           : quoteError || rateError
+                           ? "Price unavailable"
+                           : `$${usdValue}`
+                        : isRateLoading
+                        ? "Loading rate..."
+                        : rateError
+                        ? "Rate unavailable"
+                        : exchangeRateText}
                   </span>
                )}
             </div>

@@ -1,240 +1,208 @@
 // src/contracts/hooks/useQuoteContract.ts
-import { useReadContract } from "wagmi";
-import { parseUnits, formatUnits } from "viem";
-import { useState, useEffect } from "react";
-import QuoteContractABI from "../abis/QuoteContract.json";
-import { CONTRACT_ADDRESSES, TOKEN_ADDRESSES } from "../addresses";
+import { useState, useEffect } from 'react';
+import { logger } from '../../utils/swapUtils';
 
 // Cache to store recent quotes (simple in-memory cache)
-const quoteCache: Record<string, { value: string; timestamp: number }> = {};
-const CACHE_EXPIRY = 30000; // 30 seconds
+const ratesCache: {
+  data: Record<string, any> | null;
+  timestamp: number;
+} = {
+  data: null,
+  timestamp: 0
+};
 
-// Tokens that have direct USDC pairs (this may need adjusting based on your DEX liquidity)
-const DIRECT_USDC_PAIRS = ["USDC", "USDT", "WETH", "ETH"];
+const CACHE_EXPIRY = 60000; // 1 minute cache
 
-export function useTokenQuote(amountIn: string, tokenSymbol: string | null) {
-   const [quoteResult, setQuoteResult] = useState({
-      quote: "0",
-      quoteInUSD: 0,
-      isLoading: false,
-      isError: false,
-      source: "loading" as "direct" | "path" | "cache" | "loading" | "error",
-   });
-
-   // Skip the query if amount is empty or zero or token is not selected
-   const enabled = !!amountIn && parseFloat(amountIn) > 0 && !!tokenSymbol;
-
-   // Get token address from symbol
-   const tokenInAddress = tokenSymbol
-      ? TOKEN_ADDRESSES[tokenSymbol as keyof typeof TOKEN_ADDRESSES]
-      : null;
-   // USDC is our quote token (for USD value)
-   const tokenOutAddress = TOKEN_ADDRESSES.USDC;
-
-   // Handle ETH as WETH for contract interactions
-   const actualTokenInAddress =
-      tokenInAddress === "ETH"
-         ? TOKEN_ADDRESSES.WETH // Use WETH address when input is ETH
-         : tokenInAddress;
-
-   // Determine if we should use direct or path-based quote
-   const needsPath = !DIRECT_USDC_PAIRS.includes(tokenSymbol || "");
-
-   // Get token decimals
-   const tokenInDecimals =
-      tokenSymbol === "USDC" || tokenSymbol === "USDT" ? 6 : 18;
-
-   // Check cache first for recent quotes
-   const cacheKey = `${amountIn}-${tokenSymbol}-USDC`;
-   const cachedQuote = quoteCache[cacheKey];
-   const isCacheValid =
-      cachedQuote && Date.now() - cachedQuote.timestamp < CACHE_EXPIRY;
-
-   // Format amount with proper decimals
-   const formattedAmountIn =
-      enabled && actualTokenInAddress
-         ? parseUnits(amountIn, tokenInDecimals)
-         : BigInt(0);
-
-   // Create the path array for path-based quotes
-   const swapPath = needsPath
-      ? [actualTokenInAddress as string, TOKEN_ADDRESSES.WETH, tokenOutAddress]
-      : undefined;
-
-   // Direct swap quote call
-   const {
-      data: directData,
-      isError: directIsError,
-      isPending: directIsPending,
-   } = useReadContract({
-      address: CONTRACT_ADDRESSES.quoteContract as `0x${string}`,
-      abi: QuoteContractABI,
-      functionName: "estimateSwapOutput",
-      args: [
-         actualTokenInAddress as `0x${string}`,
-         tokenOutAddress,
-         formattedAmountIn,
-      ],
-      query: {
-         enabled: enabled && !needsPath && !isCacheValid,
-         retry: 1,
-      },
-   });
-
-   // Path-based swap quote call
-   const {
-      data: pathData,
-      isError: pathIsError,
-      isPending: pathIsPending,
-   } = useReadContract({
-      address: CONTRACT_ADDRESSES.quoteContract as `0x${string}`,
-      abi: QuoteContractABI,
-      functionName: "estimateSwapOutputWithPath",
-      args: [swapPath as `0x${string}`[], formattedAmountIn],
-      query: {
-         enabled: enabled && needsPath && !isCacheValid,
-         retry: 1,
-      },
-   });
-
-   // Effect to update result based on direct or path-based call
-   useEffect(() => {
-      if (!enabled) {
-         setQuoteResult({
-            quote: "0",
-            quoteInUSD: 0,
-            isLoading: false,
-            isError: false,
-            source: "loading",
-         });
-         return;
+/**
+ * Hook to get current token price quote in USD and NGN
+ * @param amount - Amount of token as string 
+ * @param tokenSymbol - Token symbol or null
+ * @returns Quote information and loading state
+ */
+export function useTokenQuote(
+  amount: string,
+  tokenSymbol: string | null
+): { 
+  quoteInUSD: number | null; 
+  quoteInNGN: number | null;
+  isLoading: boolean;
+  error: string | null;
+  source: 'api' | 'cache' | 'loading' | 'error';
+} {
+  const [quoteResult, setQuoteResult] = useState({
+    quoteInUSD: null as number | null,
+    quoteInNGN: null as number | null,
+    isLoading: false,
+    error: null as string | null,
+    source: 'loading' as 'api' | 'cache' | 'loading' | 'error'
+  });
+  
+  // Skip if no amount or token
+  const shouldFetch = Boolean(
+    amount && 
+    parseFloat(amount) > 0 && 
+    tokenSymbol
+  );
+  
+  // Fetch rates from API
+  useEffect(() => {
+    if (!shouldFetch) {
+      setQuoteResult(prev => ({
+        ...prev,
+        quoteInUSD: null,
+        quoteInNGN: null,
+        isLoading: false,
+        error: null,
+        source: 'loading'
+      }));
+      return;
+    }
+    
+    const fetchRates = async () => {
+      try {
+        setQuoteResult(prev => ({ ...prev, isLoading: true }));
+        
+        // Check if cache is valid
+        const isCacheValid = ratesCache.data && 
+                            (Date.now() - ratesCache.timestamp < CACHE_EXPIRY);
+        
+        if (isCacheValid && ratesCache.data) {
+          // Use cached rates
+          calculateQuote(amount, tokenSymbol, ratesCache.data, 'cache');
+          return;
+        }
+        
+        // Fetch new rates
+        const response = await fetch('https://aboki-api.onrender.com/api/conversion/rates');
+        
+        if (!response.ok) {
+          throw new Error(`API responded with status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (!data.success) {
+          throw new Error(data.message || 'Failed to fetch rates');
+        }
+        
+        // Update cache
+        ratesCache.data = data;
+        ratesCache.timestamp = Date.now();
+        
+        // Calculate and set quote
+        calculateQuote(amount, tokenSymbol, data, 'api');
+        
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+        logger.log('ERROR', `Failed to fetch rates: ${errorMsg}`, error);
+        
+        setQuoteResult({
+          quoteInUSD: null,
+          quoteInNGN: null,
+          isLoading: false,
+          error: errorMsg,
+          source: 'error'
+        });
       }
-
-      // Use cache if valid
-      if (isCacheValid) {
-         setQuoteResult({
-            quote: cachedQuote.value,
-            quoteInUSD: parseFloat(cachedQuote.value),
-            isLoading: false,
-            isError: false,
-            source: "cache",
-         });
-         return;
+    };
+    
+    fetchRates();
+  }, [amount, tokenSymbol, shouldFetch]);
+  
+  // Helper function to calculate quote from rates
+  const calculateQuote = (
+    amount: string, 
+    tokenSymbol: string | null, 
+    data: any,
+    source: 'api' | 'cache'
+  ) => {
+    try {
+      const amountNum = parseFloat(amount);
+      
+      // Check if token exists in API response
+      if (!tokenSymbol || !data.rates[tokenSymbol]) {
+        setQuoteResult({
+          quoteInUSD: null,
+          quoteInNGN: null,
+          isLoading: false,
+          error: `${tokenSymbol} not found in API rates. Exchange rates unavailable.`,
+          source: 'error'
+        });
+        
+        logger.log('ERROR', `Token ${tokenSymbol} not found in API rates`, {
+          availableTokens: Object.keys(data.rates)
+        });
+        return;
       }
-
-      // Set loading state
-      if ((needsPath && pathIsPending) || (!needsPath && directIsPending)) {
-         setQuoteResult((prev) => ({
-            ...prev,
-            isLoading: true,
-            source: "loading",
-         }));
-         return;
+      
+      // Get data for the token - Using only fields directly from the API
+      const tokenData = data.rates[tokenSymbol];
+      const usdPrice = tokenData.usdPrice;
+      
+      // Use ngnSellPrice ONLY for display/quoting 
+      const ngnPrice = tokenData.ngnSellPrice;
+      
+      if (!usdPrice || !ngnPrice) {
+        setQuoteResult({
+          quoteInUSD: null,
+          quoteInNGN: null,
+          isLoading: false,
+          error: `${tokenSymbol} rates incomplete in API response`,
+          source: 'error'
+        });
+        return;
       }
-
-      // Handle results based on whether we're using direct or path-based quote
-      if (needsPath) {
-         if (pathIsError) {
-            console.error("Path-based quote failed:", pathIsError);
-            setQuoteResult({
-               quote: "0",
-               quoteInUSD: 0,
-               isLoading: false,
-               isError: true,
-               source: "error",
-            });
-         } else if (pathData) {
-            const formattedQuote = formatUnits(pathData as bigint, 6); // USDC has 6 decimals
-            console.log("Path-based quote:", formattedQuote);
-
-            // Update cache
-            quoteCache[cacheKey] = {
-               value: formattedQuote,
-               timestamp: Date.now(),
-            };
-
-            setQuoteResult({
-               quote: formattedQuote,
-               quoteInUSD: parseFloat(formattedQuote),
-               isLoading: false,
-               isError: false,
-               source: "path",
-            });
-         }
-      } else {
-         if (directIsError) {
-            console.error("Direct quote failed:", directIsError);
-            setQuoteResult({
-               quote: "0",
-               quoteInUSD: 0,
-               isLoading: false,
-               isError: true,
-               source: "error",
-            });
-         } else if (directData) {
-            const formattedQuote = formatUnits(directData as bigint, 6); // USDC has 6 decimals
-            console.log("Direct quote:", formattedQuote);
-
-            // Update cache
-            quoteCache[cacheKey] = {
-               value: formattedQuote,
-               timestamp: Date.now(),
-            };
-
-            setQuoteResult({
-               quote: formattedQuote,
-               quoteInUSD: parseFloat(formattedQuote),
-               isLoading: false,
-               isError: false,
-               source: "direct",
-            });
-         }
-      }
-   }, [
-      enabled,
-      needsPath,
-      directData,
-      pathData,
-      directIsError,
-      pathIsError,
-      directIsPending,
-      pathIsPending,
-      isCacheValid,
-      cachedQuote,
-   ]);
-
-   // Debug logs
-   useEffect(() => {
-      console.log("Quote params:", {
-         amountIn,
-         tokenSymbol,
-         formattedAmountIn: formattedAmountIn.toString(),
-         needsPath,
-         swapPath,
-         contractAddress: CONTRACT_ADDRESSES.quoteContract,
-         quoteResult,
+      
+      // Calculate quotes
+      const usdQuote = amountNum * usdPrice;
+      const ngnQuote = amountNum * ngnPrice;
+      
+      setQuoteResult({
+        quoteInUSD: usdQuote,
+        quoteInNGN: ngnQuote,
+        isLoading: false,
+        error: null,
+        source
       });
-   }, [amountIn, tokenSymbol, formattedAmountIn, needsPath, quoteResult]);
-
-   return quoteResult;
+      
+      logger.log('QUOTE', `${source} quote for ${tokenSymbol}: $${usdQuote.toFixed(2)}, ₦${ngnQuote.toFixed(2)}`, {
+        amount: amountNum,
+        usdPrice,
+        ngnPrice,
+        usdQuote,
+        ngnQuote
+      });
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      logger.log('ERROR', `Failed to calculate quote: ${errorMsg}`, error);
+      
+      setQuoteResult({
+        quoteInUSD: null,
+        quoteInNGN: null,
+        isLoading: false,
+        error: errorMsg,
+        source: 'error'
+      });
+    }
+  };
+  
+  return quoteResult;
 }
 
-// Helper function to format balance to avoid overflow
+// Format balance for display
 export function formatBalance(
-   balance: string,
-   maxDecimals: number = 6
+  balanceStr: string, 
+  maxDecimals: number = 4
 ): string {
-   if (!balance || balance === "0" || balance === "0.00") return "0.00";
-
-   const number = parseFloat(balance);
-   if (isNaN(number)) return "0.00";
-
-   // For very small numbers, show scientific notation
-   if (number < 0.000001) return number.toExponential(4);
-
-   // For other numbers, limit decimal places
-   return number.toLocaleString("en-US", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: maxDecimals,
-   });
+  const balance = parseFloat(balanceStr || '0');
+  if (isNaN(balance)) return "0.00";
+  
+  if (balance < 0.0001) {
+    return "< 0.0001";
+  }
+  
+  return balance.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: maxDecimals
+  });
 }

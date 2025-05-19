@@ -1,11 +1,11 @@
-import logo from "../assets/logo-black.png";
+import logo from "../assets/aboki.svg";
 
 const Logo = () => {
    return (
       <img
          src={logo}
          alt="Aboki Logo"
-         className=" object-cover rounded-lg w-45 h-12 mr-4"
+         className=" object-cover rounded-lg w-27 h-9 mr-4"
       />
    );
 };
